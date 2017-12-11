@@ -66,15 +66,16 @@ public class QueryChaincode {
           InterruptedException, ExecutionException, TimeoutException, IllegalAccessException, InstantiationException,
           ClassNotFoundException, NoSuchMethodException, InvocationTargetException
   {
-      String channelName = "drugchan";
-      String chainCode = "bbb";
-      String peerName = "peer0.druginc.drug.com";
+      String channelName = StaticConfig.CHANNEL_NAME;
+      String chainCode = StaticConfig.CHAIN_CODE_ID;
+      String org = "maple";
+      String peerName = "peer0." + org + ".funds.com";
       String[] params = new String[] { accountHolder };
       System.out.println(accountHolder);
-      User user = new UserFileSystem("Admin", "druginc.drug.com");
+      User user = new UserFileSystem("Admin", org + ".funds.com");
       QueryResult queryResult = new QueryResult();
       
-      String result = query(params, "druginc", peerName, channelName, chainCode, user);
+      String result = query(params, org, peerName, channelName, chainCode, user);
       queryResult.setResponse(result);
       System.out.println("executed query: result is " + queryResult.getResponse());
       return queryResult;
