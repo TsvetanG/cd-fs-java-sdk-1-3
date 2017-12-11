@@ -6,10 +6,10 @@
 ---
 # A Shotgun policy xx
 identities:  # list roles to be used in the policy
-    user1: {"role": {"name": "member", "mspId": "pharma"}} # role member in org with mspid Org1MSP
-    user2: {"role": {"name": "member", "mspId": "druginc"}}
-    admin1: {"role": {"name": "admin", "mspId": "pharma"}} # admin role.
-    admin2: {"role": {"name": "admin", "mspId": "druginc"}}
+    user1: {"role": {"name": "member", "mspId": "maple"}} # role member in org with mspid Org1MSP
+    user2: {"role": {"name": "member", "mspId": "fundinc"}}
+    admin1: {"role": {"name": "admin", "mspId": "maple"}} # admin role.
+    admin2: {"role": {"name": "admin", "mspId": "fundinc"}}
 
 policy: # the policy  .. could have been flat but show grouping.
     1-of: # signed by one of these groups  can be <n>-of  where <n> is any digit 2-of, 3-of etc..
