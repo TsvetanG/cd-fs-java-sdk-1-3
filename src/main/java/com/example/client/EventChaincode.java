@@ -43,12 +43,11 @@ public class EventChaincode implements ChaincodeEventListener {
       throws CryptoException, InvalidArgumentException, TransactionException, IOException, ProposalException,
       InterruptedException, ExecutionException, TimeoutException, IllegalAccessException, InstantiationException,
       ClassNotFoundException, NoSuchMethodException, InvocationTargetException {
-    String channelName = "transfer";
-     
-    String chainCode = "javacc";
-    String org = "druginc";
-    String ops = "transfer";
-    User user = new UserFileSystem("Admin", "druginc.drug.com");
+
+    String channelName = StaticConfig.CHANNEL_NAME;
+    String chainCode = StaticConfig.CHAIN_CODE_ID;
+    String org = "maple"; 
+    User user = new UserFileSystem("Admin", "maple.funds.com");
     new EventChaincode().start(chainCode, channelName, org, user);
     System.out.println("DONE ->>>>>>>>>>>>>>>");
   }

@@ -49,13 +49,13 @@ public class InstantiateChaincode {
       InstantiationException, ClassNotFoundException, NoSuchMethodException, InvocationTargetException,
       TransactionException, IOException, ProposalException, ChaincodeEndorsementPolicyParseException {
 
-    String chaincodeName = "javacc";
-    String channelName = "drug";
-    int version = 12;
-    String org = "druginc";
+    String chaincodeName = StaticConfig.CHAIN_CODE_ID;
+    String channelName = StaticConfig.CHANNEL_NAME;
+    int version = 1;
+    String org = "maple";
     boolean isUpgrade = false;
     InstantiateChaincode instantiate = new InstantiateChaincode();
-    User user = new UserFileSystem("Admin", "druginc.drug.com");
+    User user = new UserFileSystem("Admin", "maple.funds.com");
     String[] params = new String[] { "Alice", "500", "Bob", "500" };
     instantiate.instantiate(chaincodeName, channelName, org, version, user, params, isUpgrade);
 

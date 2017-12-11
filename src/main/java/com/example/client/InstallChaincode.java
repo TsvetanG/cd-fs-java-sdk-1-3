@@ -45,13 +45,14 @@ public class InstallChaincode {
   public static void main(String[] args) throws CryptoException, InvalidArgumentException, IllegalAccessException, InstantiationException, ClassNotFoundException, NoSuchMethodException, InvocationTargetException, TransactionException, IOException, ProposalException, ChaincodeEndorsementPolicyParseException {
 
     String path = "../cd-java-cc";
-    String channelName = "drug";
-    int version = 12; 
-    String chaincodeName = "javacc";
-    String peerName = "peer0.druginc.drug.com";
-    String org = "druginc";
+    String channelName = StaticConfig.CHANNEL_NAME;
+    String org = "maple";
+    int version = 1; 
+    String chaincodeName = StaticConfig.CHAIN_CODE_ID;
+    
+    String peerName = "peer0." + org + ".funds.com";
     InstallChaincode install = new InstallChaincode();
-    User user = new UserFileSystem("Admin", "druginc.drug.com"); 
+    User user = new UserFileSystem("Admin", org + ".funds.com"); 
     install.install(path, org ,  peerName , channelName, chaincodeName, version, user);
 
   }

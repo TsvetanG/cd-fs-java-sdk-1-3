@@ -26,9 +26,10 @@ public class BlockWalk {
   public static void main(String[] args) throws UnsupportedEncodingException, FileNotFoundException, IOException,
       CryptoException, InvalidArgumentException, IllegalAccessException, InstantiationException, ClassNotFoundException,
       NoSuchMethodException, InvocationTargetException, TransactionException, ProposalException {
-    String channelName = "drug";
-    String org = "druginc";
-    User user = new UserFileSystem("Admin", "druginc.drug.com");
+    
+    String channelName = StaticConfig.CHANNEL_NAME;
+    String org = "maple";
+    User user = new UserFileSystem("Admin", org + ".funds.com");
 
     new BlockWalk().walk(channelName, org, user);
   }

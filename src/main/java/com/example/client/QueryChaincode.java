@@ -49,13 +49,14 @@ public class QueryChaincode {
   public static void main(String[] args) throws CryptoException, InvalidArgumentException, TransactionException,
       IOException, ProposalException, InterruptedException, ExecutionException, TimeoutException, IllegalAccessException, InstantiationException, ClassNotFoundException, NoSuchMethodException, InvocationTargetException {
  
-    String channelName = "drugchan";
-    String chainCode = "bbb";
-    String peerName = "peer0.druginc.drug.com";
+    String channelName =  StaticConfig.CHANNEL_NAME;
+    String chainCode = StaticConfig.CHAIN_CODE_ID;
+    String org = "maple"; //Change this to the next organization to perform the same operation
+    String peerName = "peer0." + org + ".funds.com";
     String[] params = new String[] { "Bob" }; 
     
-    User user = new UserFileSystem("Admin", "druginc.drug.com");
-    new QueryChaincode().query(params, "druginc", peerName, channelName, chainCode, user);
+    User user = new UserFileSystem("Admin", org + ".funds.com");
+    new QueryChaincode().query(params, org , peerName, channelName, chainCode, user);
 
   }
 

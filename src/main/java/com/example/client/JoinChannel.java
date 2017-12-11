@@ -35,12 +35,18 @@ public class JoinChannel {
 
   public static void main(String[] args) throws CryptoException, InvalidArgumentException, IllegalAccessException, InstantiationException, ClassNotFoundException, NoSuchMethodException, InvocationTargetException, TransactionException, IOException, ProposalException {
  
-    String channelName = "transfer";
-    String org = "druginc"; 
-    String peer = "<peer name>:grpcs://<host>:<port>";
-    String eventHub = "<peer name>:grpcs://<host>:<port>";
+    /**
+     * For the correct ports check docker-compose-base.yaml
+     */
+    String channelName = StaticConfig.CHANNEL_NAME;
+    String org = "maple"; 
+    String portClient = "7051";// for fundinc 9051
+    String portEventHub = "7053"; // for fuindinc 9053
+    
+    String peer = "peer0." + org + ".funds.com:" + StaticConfig.GRPC_HOST + ":" + portClient;
+    String eventHub = "peer0." + org + ".funds.com:" + StaticConfig.GRPC_HOST + ":" + portEventHub;
     JoinChannel join = new JoinChannel();
-    User user = new UserFileSystem("Admin", "druginc.drug.com"); 
+    User user = new UserFileSystem("Admin", org + ".funds.com"); 
     join.join(channelName, peer, eventHub, org, user);
 
   }

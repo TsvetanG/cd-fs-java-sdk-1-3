@@ -63,18 +63,19 @@ public class InvokeChaincode {
       throws CryptoException, InvalidArgumentException, TransactionException, IOException, ProposalException,
       InterruptedException, ExecutionException, TimeoutException, IllegalAccessException, InstantiationException,
       ClassNotFoundException, NoSuchMethodException, InvocationTargetException {
-    String channelName = "drugchan";
+    
+    String channelName = StaticConfig.CHANNEL_NAME;
     String[] params = new String[] { "Alice", "Bob", "20" };
-    String peerName = "peer0.druginc.drug.com";
+    String peerName = "peer0.maple.funds.com";
     if (args != null && args.length != 0) {
       params = args;
       sleepTime = Integer.parseInt(args[0]);
       sleepTime = sleepTime*1000;
     }
-    String chainCode = "bbb";
-    String org = "druginc";
+    String chainCode = StaticConfig.CHAIN_CODE_ID;
+    String org = "maple";
     String ops = "transfer";
-    User user = new UserFileSystem("Admin", "druginc.drug.com");
+    User user = new UserFileSystem("Admin", "maple.funds.com");
     TransactionEvent event = new InvokeChaincode().invoke(ops, params, org,peerName, channelName, chainCode, user);
     if (event != null) {
       // event.getTransactionID().
@@ -92,13 +93,13 @@ public class InvokeChaincode {
   {
 
       String ops = "transfer";
-      String org = "druginc";
-      String channelName = "drugchan";
-      String chainCode = "bbb";
-      //String[] params = new String[] { "Bob", "Alice", "20" };
+      String org = "maple";
+      String channelName = StaticConfig.CHANNEL_NAME;
+      String chainCode =StaticConfig.CHAIN_CODE_ID;
+
       String[] params = chaincodeParameters;
-      String peerName = "peer0.druginc.drug.com";
-      User user = new UserFileSystem("Admin", "druginc.drug.com");
+      String peerName = "peer0.maple.funds.com";
+      User user = new UserFileSystem("Admin", "maple.funds.com");
 
       TransactionEvent event = new InvokeChaincode().invoke(ops, params, org, peerName, channelName,
               chainCode, user);
@@ -120,10 +121,8 @@ public class InvokeChaincode {
     client.setUserContext(user);
     Channel channel = util.reconstructChannel(org, channelName, peerName, client);
 
-    ChaincodeID chaincodeID;
-
-    // chaincodeID =
-    // ChaincodeID.newBuilder().setName(chainCode).setPath("main/java").build();
+    ChaincodeID chaincodeID; 
+    
     chaincodeID = ChaincodeID.newBuilder().setName(chainCode).build();
 
     TransactionProposalRequest transactionProposalRequest = client.newTransactionProposalRequest();
