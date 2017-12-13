@@ -55,7 +55,7 @@ public class InstantiateChaincode {
     String org = "maple";
     boolean isUpgrade = false;
     InstantiateChaincode instantiate = new InstantiateChaincode();
-    User user = new UserFileSystem("Admin", "maple.funds.com");
+    User user = new UserFileSystem("Admin", org + ".funds.com");
     String[] params = new String[] { "Alice", "500", "Bob", "500" };
     instantiate.instantiate(chaincodeName, channelName, org, version, user, params, isUpgrade);
 

@@ -65,17 +65,19 @@ public class InvokeChaincode {
       ClassNotFoundException, NoSuchMethodException, InvocationTargetException {
     
     String channelName = StaticConfig.CHANNEL_NAME;
+    String chainCode = StaticConfig.CHAIN_CODE_ID;
+    String ops = "transfer";
+    String org = "maple";
+    String peerName = "peer0." + org + ".funds.com";
     String[] params = new String[] { "Alice", "Bob", "20" };
-    String peerName = "peer0.maple.funds.com";
+    
     if (args != null && args.length != 0) {
       params = args;
       sleepTime = Integer.parseInt(args[0]);
       sleepTime = sleepTime*1000;
     }
-    String chainCode = StaticConfig.CHAIN_CODE_ID;
-    String org = "maple";
-    String ops = "transfer";
-    User user = new UserFileSystem("Admin", "maple.funds.com");
+
+    User user = new UserFileSystem("Admin", org + ".funds.com");
     TransactionEvent event = new InvokeChaincode().invoke(ops, params, org,peerName, channelName, chainCode, user);
     if (event != null) {
       // event.getTransactionID().
