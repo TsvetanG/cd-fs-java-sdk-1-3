@@ -24,15 +24,19 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.hyperledger.fabric.sdk.ChaincodeEndorsementPolicy;
 import org.hyperledger.fabric.sdk.ChaincodeID;
 import org.hyperledger.fabric.sdk.Channel;
 import org.hyperledger.fabric.sdk.HFClient;
 import org.hyperledger.fabric.sdk.InstantiateProposalRequest;
+import org.hyperledger.fabric.sdk.Orderer;
+import org.hyperledger.fabric.sdk.Peer;
 import org.hyperledger.fabric.sdk.ProposalResponse;
 import org.hyperledger.fabric.sdk.UpgradeProposalRequest;
-import org.hyperledger.fabric.sdk.User;
 import org.hyperledger.fabric.sdk.exception.ChaincodeEndorsementPolicyParseException;
 import org.hyperledger.fabric.sdk.exception.CryptoException;
 import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
@@ -45,32 +49,35 @@ import com.example.client.impl.UserFileSystem;
 
 public class InstantiateChaincode {
 
-	public static void main(String[] args) throws CryptoException, InvalidArgumentException, IllegalAccessException,
-			InstantiationException, ClassNotFoundException, NoSuchMethodException, InvocationTargetException,
-			TransactionException, IOException, ProposalException, ChaincodeEndorsementPolicyParseException {
+	public static void main(String[] args)
+			throws CryptoException, InvalidArgumentException, IllegalAccessException, InstantiationException,
+			ClassNotFoundException, NoSuchMethodException, InvocationTargetException, TransactionException, IOException,
+			ProposalException, ChaincodeEndorsementPolicyParseException, InterruptedException, ExecutionException {
 
 		String chaincodeName = StaticConfig.CHAIN_CODE_ID;
 		String channelName = StaticConfig.CHANNEL_NAME;
 		int version = 1;
 		String org = "maple";
 		InstantiateChaincode instantiate = new InstantiateChaincode();
-		User user = new UserFileSystem("Admin", org + ".funds.com");
+		UserFileSystem user = new UserFileSystem("Admin", org + ".fund.com");
 		String[] params = new String[] { "Alice", "500", "Bob", "500" };
 		Collection<String> peers = new HashSet<>();
 		peers.add(StaticConfig.DISCOVER_PEER_MAPLE);
-		instantiate.instantiate(chaincodeName, channelName, peers, version, user, params);
+		instantiate.instantiate(chaincodeName, channelName, peers, StaticConfig.ORDERER, version, user, params);
 
 	}
 
-	protected void instantiate(String chaincodeName, String channelID, Collection<String> peers, int version, User user,
-			String[] params) throws InvalidArgumentException, TransactionException, IOException, CryptoException,
-			IllegalAccessException, InstantiationException, ClassNotFoundException, NoSuchMethodException,
-			InvocationTargetException, ChaincodeEndorsementPolicyParseException, ProposalException {
+	protected void instantiate(String chaincodeName, String channelID, Collection<String> peers, String orderer,
+			int version, UserFileSystem user, String[] params)
+			throws InvalidArgumentException, TransactionException, IOException, CryptoException, IllegalAccessException,
+			InstantiationException, ClassNotFoundException, NoSuchMethodException, InvocationTargetException,
+			ChaincodeEndorsementPolicyParseException, ProposalException, InterruptedException, ExecutionException {
 		HFClient client = HFClient.createNewInstance();
 		client.setCryptoSuite(CryptoSuite.Factory.getCryptoSuite());
 		client.setUserContext(user);
 		ChannelUtil util = new ChannelUtil();
-		Channel channel = util.reconstructChannelServiceDiscovery(channelID, (String) peers.toArray()[0], client);
+		Channel channel = util.reconstructChannelServiceDiscovery(channelID, (String) peers.toArray()[0], client, user);
+		Orderer ordering = util.createOrderer(client, orderer);
 
 		ChaincodeID chaincodeID;
 		Collection<ProposalResponse> responses;
@@ -80,6 +87,13 @@ public class InstantiateChaincode {
 		Collection<String> chainCodes = channel.getDiscoveredChaincodeNames();
 
 		boolean isUpgrade = chainCodes.contains(chaincodeName);
+
+		Collection<Peer> peersToSend = new HashSet<>();
+		for (Peer discPeer : channel.getPeers()) {
+			if (!discPeer.getUrl().contains("fund.com")) {
+				peersToSend.add(discPeer);
+			}
+		}
 
 		chaincodeID = ChaincodeID.newBuilder().setName(chaincodeName).setVersion(String.valueOf(version)).build();
 		if (isUpgrade) {
@@ -98,7 +112,7 @@ public class InstantiateChaincode {
 			ChaincodeEndorsementPolicy chaincodeEndorsementPolicy = new ChaincodeEndorsementPolicy();
 			chaincodeEndorsementPolicy.fromYamlFile(new File("./store/endorsement/chaincodeendorsementpolicy.yaml"));
 			upgrade.setChaincodeEndorsementPolicy(chaincodeEndorsementPolicy);
-			responses = channel.sendUpgradeProposal(upgrade, channel.getPeers());
+			responses = channel.sendUpgradeProposal(upgrade, peersToSend);
 		} else {
 
 			InstantiateProposalRequest instantiateProposalRequest = client.newInstantiationProposalRequest();
@@ -118,7 +132,7 @@ public class InstantiateChaincode {
 			chaincodeEndorsementPolicy.fromYamlFile(new File("./store/endorsement/chaincodeendorsementpolicy.yaml"));
 			instantiateProposalRequest.setChaincodeEndorsementPolicy(chaincodeEndorsementPolicy);
 
-			responses = channel.sendInstantiationProposal(instantiateProposalRequest, channel.getPeers());
+			responses = channel.sendInstantiationProposal(instantiateProposalRequest, peersToSend);
 		}
 
 		for (ProposalResponse response : responses) {
@@ -131,11 +145,15 @@ public class InstantiateChaincode {
 			}
 		}
 
-		if (failed.size() > 0) {
-			ProposalResponse first = failed.iterator().next();
-		} else {
-			// send the transaction to ordering
-			channel.sendTransaction(successful);
+		if (!successful.isEmpty()) {
+			Collection<Orderer> orderers = new HashSet<>();
+			orderers.add(ordering);
+			channel.addOrderer(ordering);
+			try {
+				channel.sendTransaction(successful, orderers).get(120, TimeUnit.SECONDS);
+			} catch (TimeoutException e) {
+				throw new RuntimeException(e);
+			}
 		}
 		System.out.println("DONE=>>>>>>>>>>>>>>>>>>>>>>>>>");
 	}

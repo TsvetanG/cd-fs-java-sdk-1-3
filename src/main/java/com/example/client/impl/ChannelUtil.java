@@ -37,17 +37,19 @@ import org.springframework.util.StringUtils;
 
 public class ChannelUtil {
 
-	public Channel reconstructChannelServiceDiscovery(String channelID, String discoveryPeer, HFClient client)
+	public Channel reconstructChannelServiceDiscovery(String channelID, String discoveryPeer, HFClient client,
+			UserFileSystem user)
 			throws FileNotFoundException, InvalidArgumentException, TransactionException, IOException {
 		Peer peer = null;
 		if (discoveryPeer != null) {
 			peer = createPeer(client, discoveryPeer);
 		}
 
-		return reconstructChannelServiceDiscovery(channelID, peer, client);
+		return reconstructChannelServiceDiscovery(channelID, peer, client, user);
 	}
 
-	public Channel reconstructChannelServiceDiscovery(String channelID, Peer discoveryPeer, HFClient client)
+	public Channel reconstructChannelServiceDiscovery(String channelID, Peer discoveryPeer, HFClient client,
+			UserFileSystem user)
 			throws FileNotFoundException, IOException, InvalidArgumentException, TransactionException {
 		Channel channel;
 		try {
@@ -61,8 +63,8 @@ public class ChannelUtil {
 				channel.addPeer(discoveryPeer,
 						Channel.PeerOptions.createPeerOptions().setPeerRoles(EnumSet.of(PeerRole.SERVICE_DISCOVERY,
 								PeerRole.LEDGER_QUERY, PeerRole.EVENT_SOURCE, PeerRole.CHAINCODE_QUERY)));
-				channel.setServiceDiscoveryProperties(getServiceDiscoveryProps(client.getUserContext().getName(),
-						client.getUserContext().getMspId()));
+				channel.setServiceDiscoveryProperties(getServiceDiscoveryProps(
+						client.getUserContext().getName() + "@" + user.getOrgName(), user.getOrgName()));
 			} catch (InvalidArgumentException e) {
 				throw new RuntimeException("Could not add peer to channel", e);
 			}

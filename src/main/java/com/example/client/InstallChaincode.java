@@ -28,7 +28,6 @@ import org.hyperledger.fabric.sdk.InstallProposalRequest;
 import org.hyperledger.fabric.sdk.Peer;
 import org.hyperledger.fabric.sdk.ProposalResponse;
 import org.hyperledger.fabric.sdk.TransactionRequest.Type;
-import org.hyperledger.fabric.sdk.User;
 import org.hyperledger.fabric.sdk.exception.ChaincodeEndorsementPolicyParseException;
 import org.hyperledger.fabric.sdk.exception.CryptoException;
 import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
@@ -53,15 +52,15 @@ public class InstallChaincode {
 
 		String peerName = StaticConfig.DISCOVER_PEER_MAPLE;
 		InstallChaincode install = new InstallChaincode();
-		User user = new UserFileSystem("Admin", org + ".funds.com");
+		UserFileSystem user = new UserFileSystem("Admin", org + ".fund.com");
 		install.install(path, peerName, channelName, chaincodeName, version, user);
 
 	}
 
 	protected void install(String path, String discoveryPeer, String channelID, String chaincodeName, int version,
-			User user) throws CryptoException, InvalidArgumentException, IllegalAccessException, InstantiationException,
-			ClassNotFoundException, NoSuchMethodException, InvocationTargetException, TransactionException, IOException,
-			ProposalException, ChaincodeEndorsementPolicyParseException {
+			UserFileSystem user) throws CryptoException, InvalidArgumentException, IllegalAccessException,
+			InstantiationException, ClassNotFoundException, NoSuchMethodException, InvocationTargetException,
+			TransactionException, IOException, ProposalException, ChaincodeEndorsementPolicyParseException {
 
 		HFClient client = HFClient.createNewInstance();
 		client.setCryptoSuite(CryptoSuite.Factory.getCryptoSuite());
@@ -69,7 +68,7 @@ public class InstallChaincode {
 		ChannelUtil util = new ChannelUtil();
 		Peer peer = null;
 		peer = util.createPeer(client, discoveryPeer);
-		Channel channel = util.reconstructChannelServiceDiscovery(channelID, peer, client);
+		Channel channel = util.reconstructChannelServiceDiscovery(channelID, peer, client, user);
 
 		Collection<Peer> peers = channel.getPeers();
 

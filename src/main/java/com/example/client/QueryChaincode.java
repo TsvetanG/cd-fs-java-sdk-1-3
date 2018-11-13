@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
@@ -29,9 +30,9 @@ import javax.servlet.http.HttpServletResponse;
 import org.hyperledger.fabric.sdk.ChaincodeID;
 import org.hyperledger.fabric.sdk.Channel;
 import org.hyperledger.fabric.sdk.HFClient;
+import org.hyperledger.fabric.sdk.Peer;
 import org.hyperledger.fabric.sdk.ProposalResponse;
 import org.hyperledger.fabric.sdk.QueryByChaincodeRequest;
-import org.hyperledger.fabric.sdk.User;
 import org.hyperledger.fabric.sdk.exception.CryptoException;
 import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
 import org.hyperledger.fabric.sdk.exception.ProposalException;
@@ -58,11 +59,10 @@ public class QueryChaincode {
 		String channelName = StaticConfig.CHANNEL_NAME;
 		String chainCode = StaticConfig.CHAIN_CODE_ID;
 		String org = "maple";
-		String portClient = "7051";// for fundinc 9051
-		String discoveryPeer = "peer0." + org + ".fund.com:" + StaticConfig.GRPC_HOST + ":" + portClient;
+		String discoveryPeer = StaticConfig.DISCOVER_PEER_MAPLE;
 		String[] params = new String[] { "Bob" };
 
-		User user = new UserFileSystem("Admin", org + ".funds.com");
+		UserFileSystem user = new UserFileSystem("Admin", org + ".fund.com");
 		new QueryChaincode().query(params, org, discoveryPeer, channelName, chainCode, user);
 
 	}
@@ -78,7 +78,7 @@ public class QueryChaincode {
 		String peerName = "peer0." + org + ".funds.com";
 		String[] params = new String[] { accountHolder };
 		System.out.println(accountHolder);
-		User user = new UserFileSystem("Admin", org + ".funds.com");
+		UserFileSystem user = new UserFileSystem("Admin", org + ".funds.com");
 		QueryResult queryResult = new QueryResult();
 
 		String result = query(params, org, peerName, channelName, chainCode, user);
@@ -87,16 +87,16 @@ public class QueryChaincode {
 		return queryResult;
 	}
 
-	public String query(String[] params, String org, String peerName, String channelID, String chainCode, User user)
-			throws CryptoException, InvalidArgumentException, TransactionException, IOException, InterruptedException,
-			ExecutionException, TimeoutException, ProposalException, IllegalAccessException, InstantiationException,
-			ClassNotFoundException, NoSuchMethodException, InvocationTargetException {
+	public String query(String[] params, String org, String peerName, String channelID, String chainCode,
+			UserFileSystem user) throws CryptoException, InvalidArgumentException, TransactionException, IOException,
+			InterruptedException, ExecutionException, TimeoutException, ProposalException, IllegalAccessException,
+			InstantiationException, ClassNotFoundException, NoSuchMethodException, InvocationTargetException {
 
 		ChannelUtil util = new ChannelUtil();
 		HFClient client = HFClient.createNewInstance();
 		client.setCryptoSuite(CryptoSuite.Factory.getCryptoSuite());
 		client.setUserContext(user);
-		Channel channel = util.reconstructChannelServiceDiscovery(channelID, peerName, client);
+		Channel channel = util.reconstructChannelServiceDiscovery(channelID, peerName, client, user);
 
 		ChaincodeID chaincodeID;
 
@@ -111,8 +111,14 @@ public class QueryChaincode {
 		tm2.put("method", "QueryByChaincodeRequest".getBytes(UTF_8));
 		queryByChaincodeRequest.setTransientMap(tm2);
 
-		Collection<ProposalResponse> queryProposals = channel.queryByChaincode(queryByChaincodeRequest,
-				channel.getPeers());
+		Collection<Peer> peersToSend = new HashSet<>();
+		for (Peer discPeer : channel.getPeers()) {
+			if (!discPeer.getUrl().contains("fund.com")) {
+				peersToSend.add(discPeer);
+			}
+		}
+
+		Collection<ProposalResponse> queryProposals = channel.queryByChaincode(queryByChaincodeRequest, peersToSend);
 		for (ProposalResponse proposalResponse : queryProposals) {
 			if (!proposalResponse.isVerified() || proposalResponse.getStatus() != ProposalResponse.Status.SUCCESS) {
 				System.out.println("Cannot query on peer > " + proposalResponse.getPeer().getUrl());

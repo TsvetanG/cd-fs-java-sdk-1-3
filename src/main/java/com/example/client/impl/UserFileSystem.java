@@ -13,6 +13,7 @@
  */
 
 package com.example.client.impl;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -22,65 +23,81 @@ import java.util.Set;
 import org.hyperledger.fabric.sdk.Enrollment;
 import org.hyperledger.fabric.sdk.User;
 
-public class UserFileSystem implements User  {
+public class UserFileSystem implements User {
 
-  private Enrollment enrollment;
-  private String name;
-  private String mspId;
-  
-  public UserFileSystem(String name, String org ) throws UnsupportedEncodingException, FileNotFoundException, IOException {
-     //Load the pk files and certificate to set the enrollment
-    this.enrollment = new EnrollmentFileSystem(getCertFile(name, org ) , getPkFile(name, org));
-    this.mspId = org.substring(0, org.indexOf("."));
-    this.name = name;
-    
-  }
+	private Enrollment enrollment;
+	private String name;
+	private String orgName;
+	private String mspId;
 
-  protected String getPkFile(String uName, String org) throws IOException { 
-    File folder = new File("." + getPathToMSP(uName, org) , "keystore");
-    File[] files = folder.listFiles();
-    return files[0].getCanonicalPath();
-  }
+	public UserFileSystem(String name, String org)
+			throws UnsupportedEncodingException, FileNotFoundException, IOException {
+		// Load the pk files and certificate to set the enrollment
+		this.enrollment = new EnrollmentFileSystem(getCertFile(name, org), getPkFile(name, org));
+		this.mspId = org.substring(0, org.indexOf("."));
+		this.name = name;
+		this.orgName = org;
+	}
 
-  private String getPathToMSP(String uName, String org) {
-    return "/store/crypto-config/peerOrganizations/" + org + "/users/" + uName + "@" + org + "/msp";
+	protected String getPkFile(String uName, String org) throws IOException {
+		File folder = new File("." + getPathToMSP(uName, org), "keystore");
+		File[] files = folder.listFiles();
+		return files[0].getCanonicalPath();
+	}
 
-  }
+	private String getPathToMSP(String uName, String org) {
+		return "/store/crypto-config/peerOrganizations/" + org + "/users/" + uName + "@" + org + "/msp";
 
-  protected String getCertFile(String uName, String org) throws IOException {
-    File folder = new File(new File("." + getPathToMSP(uName, org)) , "signcerts");
-    File[] files = folder.listFiles();
-    return files[0].getCanonicalPath();
-  }
+	}
 
-  @Override
-  public String getAccount() { 
-    return null;
-  }
+	protected String getCertFile(String uName, String org) throws IOException {
+		File folder = new File(new File("." + getPathToMSP(uName, org)), "signcerts");
+		File[] files = folder.listFiles();
+		return files[0].getCanonicalPath();
+	}
 
-  @Override
-  public String getAffiliation() { 
-    return null;
-  }
+	@Override
+	public String getAccount() {
+		return null;
+	}
 
-  @Override
-  public Enrollment getEnrollment() { 
-    return enrollment;
-  }
+	@Override
+	public String getAffiliation() {
+		return null;
+	}
 
-  @Override
-  public String getMspId() { 
-    return mspId;
-  }
+	@Override
+	public Enrollment getEnrollment() {
+		return enrollment;
+	}
 
-  @Override
-  public String getName() { 
-    return name;
-  }
+	@Override
+	public String getMspId() {
+		return mspId;
+	}
 
-  @Override
-  public Set<String> getRoles() { 
-    return null;
-  }
+	@Override
+	public String getName() {
+		return name;
+	}
+
+	@Override
+	public Set<String> getRoles() {
+		return null;
+	}
+
+	/**
+	 * @return the orgName
+	 */
+	public String getOrgName() {
+		return orgName;
+	}
+
+	/**
+	 * @param orgName the orgName to set
+	 */
+	public void setOrgName(String orgName) {
+		this.orgName = orgName;
+	}
 
 }

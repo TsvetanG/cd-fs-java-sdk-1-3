@@ -20,22 +20,25 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import javax.servlet.http.HttpServletResponse;
 
+import org.hyperledger.fabric.sdk.BlockEvent;
 import org.hyperledger.fabric.sdk.BlockEvent.TransactionEvent;
+import org.hyperledger.fabric.sdk.BlockListener;
 import org.hyperledger.fabric.sdk.ChaincodeID;
 import org.hyperledger.fabric.sdk.Channel;
 import org.hyperledger.fabric.sdk.HFClient;
+import org.hyperledger.fabric.sdk.Orderer;
+import org.hyperledger.fabric.sdk.Peer;
 import org.hyperledger.fabric.sdk.ProposalResponse;
 import org.hyperledger.fabric.sdk.TransactionProposalRequest;
-import org.hyperledger.fabric.sdk.TxReadWriteSetInfo;
-import org.hyperledger.fabric.sdk.User;
 import org.hyperledger.fabric.sdk.exception.CryptoException;
 import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
 import org.hyperledger.fabric.sdk.exception.ProposalException;
@@ -54,9 +57,7 @@ import com.example.client.impl.UserFileSystem;
 
 @RestController
 @CrossOrigin(origins = "*")
-public class InvokeChaincode {
-
-	private static int sleepTime;
+public class InvokeChaincode implements BlockListener {
 
 	public static void main(String[] args)
 			throws CryptoException, InvalidArgumentException, TransactionException, IOException, ProposalException,
@@ -67,50 +68,19 @@ public class InvokeChaincode {
 		String chainCode = StaticConfig.CHAIN_CODE_ID;
 		String ops = "transfer";
 		String org = "maple";
+		String orderer = StaticConfig.ORDERER;
 		String discoveryPeer = StaticConfig.DISCOVER_PEER_MAPLE;
 		String[] params = new String[] { "Alice", "Bob", "20" };
 
-		if (args != null && args.length != 0) {
-			params = args;
-			sleepTime = Integer.parseInt(args[0]);
-			sleepTime = sleepTime * 1000;
-		}
+		UserFileSystem user = new UserFileSystem("Admin", org + ".fund.com");
+		CompletableFuture<TransactionEvent> event = new InvokeChaincode().invoke(ops, params, discoveryPeer, orderer,
+				channelName, chainCode, user);
 
-		User user = new UserFileSystem("Admin", org + ".funds.com");
-		TransactionEvent event = new InvokeChaincode().invoke(ops, params, discoveryPeer, channelName, chainCode, user);
-		if (event != null) {
-			// event.getTransactionID().
-		}
 		System.out.println("DONE ->>>>>>>>>>>>>>>");
 	}
 
-	@CrossOrigin
-	@RequestMapping(value = "/invokechaincode", method = RequestMethod.POST)
-	@ResponseBody
-	public String invokeMethod(@RequestBody String[] chaincodeParameters)
-			throws CryptoException, InvalidArgumentException, TransactionException, IOException, InterruptedException,
-			ExecutionException, TimeoutException, ProposalException, IllegalAccessException, InstantiationException,
-			ClassNotFoundException, NoSuchMethodException, InvocationTargetException {
-
-		String ops = "transfer";
-		String org = "maple";
-		String channelName = StaticConfig.CHANNEL_NAME;
-		String chainCode = StaticConfig.CHAIN_CODE_ID;
-
-		String[] params = chaincodeParameters;
-		String peerName = "peer0.maple.funds.com";
-		User user = new UserFileSystem("Admin", "maple.funds.com");
-
-		TransactionEvent event = new InvokeChaincode().invoke(ops, params, peerName, channelName, chainCode, user);
-		if (event != null) {
-			// event.getTransactionID().
-		}
-
-		return "Success!";
-	}
-
-	public TransactionEvent invoke(String operation, String[] params, String discoveryPeer, String channelID,
-			String chainCode, User user)
+	public CompletableFuture<TransactionEvent> invoke(String operation, String[] params, String discoveryPeer,
+			String orderer, String channelID, String chainCode, UserFileSystem user)
 			throws CryptoException, InvalidArgumentException, TransactionException, IOException, InterruptedException,
 			ExecutionException, TimeoutException, ProposalException, IllegalAccessException, InstantiationException,
 			ClassNotFoundException, NoSuchMethodException, InvocationTargetException {
@@ -119,7 +89,14 @@ public class InvokeChaincode {
 		HFClient client = HFClient.createNewInstance();
 		client.setCryptoSuite(CryptoSuite.Factory.getCryptoSuite());
 		client.setUserContext(user);
-		Channel channel = util.reconstructChannelServiceDiscovery(channelID, discoveryPeer, client);
+		Channel channel = util.reconstructChannelServiceDiscovery(channelID, discoveryPeer, client, user);
+		Collection<Peer> peersToSend = new HashSet<>();
+		for (Peer discPeer : channel.getPeers()) {
+			if (!discPeer.getUrl().contains("fund.com")) {
+				peersToSend.add(discPeer);
+				channel.registerBlockListener(this);
+			}
+		}
 
 		ChaincodeID chaincodeID;
 
@@ -140,40 +117,72 @@ public class InvokeChaincode {
 		Collection<ProposalResponse> failed = new LinkedList<>();
 
 		Collection<ProposalResponse> propResponse = channel.sendTransactionProposal(transactionProposalRequest,
-				channel.getPeers());
+				peersToSend);
 		for (ProposalResponse response : propResponse) {
 			if (response.getStatus() == ProposalResponse.Status.SUCCESS) {
 				successful.add(response);
+				System.out.println("Success -----------> " + response.getTransactionID());
 			} else {
 				failed.add(response);
 			}
 		}
 
-		if (failed.size() > 0) {
-			ProposalResponse firstTransactionProposalResponse = failed.iterator().next();
-			return null;
+		if (successful.size() == 0) {
+			throw new RuntimeException("Not enough endorsements");
 		}
 
-		ProposalResponse resp = propResponse.iterator().next();
-		byte[] x = resp.getChaincodeActionResponsePayload(); // This is the data returned by the chaincode.
-		String resultAsString = null;
-		if (x != null) {
-			resultAsString = new String(x, "UTF-8");
-		}
+		Collection<Orderer> orderers = new HashSet<>();
+		Orderer ordering = util.createOrderer(client, orderer);
+		orderers.add(ordering);
+		channel.addOrderer(ordering);
+		System.out.println("Sending to ordering service!");
 
-		TxReadWriteSetInfo readWriteSetInfo = resp.getChaincodeActionResponseReadWriteSetInfo();
-
-		ChaincodeID cid = resp.getChaincodeID();
-
-		Thread.currentThread().sleep(sleepTime);
-
-		////////////////////////////
-		// Send Transaction Transaction to orderer
-		return channel.sendTransaction(successful).get(10000, TimeUnit.SECONDS);
+		CompletableFuture<TransactionEvent> result = channel.sendTransaction(successful, orderers);
+		Thread.currentThread().sleep(3000);
+		return result;
 	}
 
 	@ModelAttribute
 	public void setVaryResponseHeader(HttpServletResponse response) {
 		response.setHeader("Access-Control-Allow-Origin", "*");
+	}
+
+	/**
+	 * @see org.hyperledger.fabric.sdk.BlockListener#received(org.hyperledger.fabric.sdk.BlockEvent)
+	 */
+	@Override
+	public void received(BlockEvent blockEvent) {
+		Iterable<TransactionEvent> transactionEvents = blockEvent.getTransactionEvents();
+		System.out.println("New block received!");
+
+		for (TransactionEvent event : transactionEvents) {
+			System.out.println("Transaction ID:" + event.getTransactionID());
+
+		}
+
+	}
+
+	@CrossOrigin
+	@RequestMapping(value = "/invokechaincode", method = RequestMethod.POST)
+	@ResponseBody
+	public String invokeMethod(@RequestBody String[] chaincodeParameters)
+			throws CryptoException, InvalidArgumentException, TransactionException, IOException, InterruptedException,
+			ExecutionException, TimeoutException, ProposalException, IllegalAccessException, InstantiationException,
+			ClassNotFoundException, NoSuchMethodException, InvocationTargetException {
+
+		String ops = "transfer";
+		String org = "maple";
+		String channelName = StaticConfig.CHANNEL_NAME;
+		String chainCode = StaticConfig.CHAIN_CODE_ID;
+		String orderer = StaticConfig.ORDERER;
+
+		String[] params = chaincodeParameters;
+		String peerName = "peer0.maple.funds.com";
+		UserFileSystem user = new UserFileSystem("Admin", "maple.fund.com");
+
+		CompletableFuture<TransactionEvent> event = new InvokeChaincode().invoke(ops, params, peerName, orderer,
+				channelName, chainCode, user);
+
+		return "Success!";
 	}
 }

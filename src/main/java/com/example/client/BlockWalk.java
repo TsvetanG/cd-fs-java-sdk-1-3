@@ -11,7 +11,6 @@ import org.hyperledger.fabric.sdk.BlockchainInfo;
 import org.hyperledger.fabric.sdk.Channel;
 import org.hyperledger.fabric.sdk.HFClient;
 import org.hyperledger.fabric.sdk.TxReadWriteSetInfo;
-import org.hyperledger.fabric.sdk.User;
 import org.hyperledger.fabric.sdk.exception.CryptoException;
 import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
 import org.hyperledger.fabric.sdk.exception.ProposalException;
@@ -32,12 +31,12 @@ public class BlockWalk {
 		String org = "maple";
 		String portClient = "7051";// for fundinc 9051
 		String discoveryPeer = "peer0." + org + ".fund.com:" + StaticConfig.GRPC_HOST + ":" + portClient;
-		User user = new UserFileSystem("Admin", org + ".funds.com");
+		UserFileSystem user = new UserFileSystem("Admin", org + ".fund.com");
 
 		new BlockWalk().walk(channelName, discoveryPeer, user);
 	}
 
-	protected void walk(String channelName, String discoveryPeer, User user) throws CryptoException,
+	protected void walk(String channelName, String discoveryPeer, UserFileSystem user) throws CryptoException,
 			InvalidArgumentException, IllegalAccessException, InstantiationException, ClassNotFoundException,
 			NoSuchMethodException, InvocationTargetException, TransactionException, IOException, ProposalException {
 
@@ -45,11 +44,11 @@ public class BlockWalk {
 		HFClient client = HFClient.createNewInstance();
 		client.setCryptoSuite(CryptoSuite.Factory.getCryptoSuite());
 		client.setUserContext(user);
-		Channel channel = util.reconstructChannelServiceDiscovery(channelName, discoveryPeer, client);
+		Channel channel = util.reconstructChannelServiceDiscovery(channelName, discoveryPeer, client, user);
 
 		BlockchainInfo channelInfo = channel.queryBlockchainInfo();
 
-		System.err.println("Blocks height " + channelInfo.getHeight());
+		System.out.println("Blocks height " + channelInfo.getHeight());
 
 		for (int i = 0; i < channelInfo.getHeight(); i++) {
 			BlockInfo returnedBlock = channel.queryBlockByNumber(i);
