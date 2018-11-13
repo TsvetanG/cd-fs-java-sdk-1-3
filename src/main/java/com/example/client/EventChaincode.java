@@ -12,19 +12,16 @@
  *  DO NOT USE IN PROJECTS , NOT for use in production
  */
 
-
 package com.example.client;
 
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
-import java.util.regex.Pattern;
 
 import org.hyperledger.fabric.sdk.BlockEvent;
 import org.hyperledger.fabric.sdk.ChaincodeEvent;
 import org.hyperledger.fabric.sdk.ChaincodeEventListener;
-import org.hyperledger.fabric.sdk.Channel;
 import org.hyperledger.fabric.sdk.HFClient;
 import org.hyperledger.fabric.sdk.User;
 import org.hyperledger.fabric.sdk.exception.CryptoException;
@@ -38,39 +35,38 @@ import com.example.client.impl.UserFileSystem;
 
 public class EventChaincode implements ChaincodeEventListener {
 
- 
-  public static void main(String[] args)
-      throws CryptoException, InvalidArgumentException, TransactionException, IOException, ProposalException,
-      InterruptedException, ExecutionException, TimeoutException, IllegalAccessException, InstantiationException,
-      ClassNotFoundException, NoSuchMethodException, InvocationTargetException {
+	public static void main(String[] args)
+			throws CryptoException, InvalidArgumentException, TransactionException, IOException, ProposalException,
+			InterruptedException, ExecutionException, TimeoutException, IllegalAccessException, InstantiationException,
+			ClassNotFoundException, NoSuchMethodException, InvocationTargetException {
 
-    String channelName = StaticConfig.CHANNEL_NAME;
-    String chainCode = StaticConfig.CHAIN_CODE_ID;
-    String org = "maple"; 
-    User user = new UserFileSystem("Admin", "maple.funds.com");
-    new EventChaincode().start(chainCode, channelName, org, user);
-    System.out.println("DONE ->>>>>>>>>>>>>>>");
-  }
+		String channelName = StaticConfig.CHANNEL_NAME;
+		String chainCode = StaticConfig.CHAIN_CODE_ID;
+		String org = "maple";
+		User user = new UserFileSystem("Admin", "maple.funds.com");
+		new EventChaincode().start(chainCode, channelName, org, user);
+		System.out.println("DONE ->>>>>>>>>>>>>>>");
+	}
 
-  private void start(String chainCode, String channelName, String org, User user) throws CryptoException, InvalidArgumentException, IllegalAccessException, InstantiationException, ClassNotFoundException, NoSuchMethodException, InvocationTargetException, TransactionException, IOException, InterruptedException {
-    ChannelUtil util = new ChannelUtil();
-    HFClient client = HFClient.createNewInstance();
-    client.setCryptoSuite(CryptoSuite.Factory.getCryptoSuite());
-    client.setUserContext(user);
-    
-    Channel channel = util.reconstructChannel(org, channelName, client);
-    String eventName = channel.registerChaincodeEventListener(Pattern.compile(".*"), Pattern.compile(Pattern.quote("event")), this);
-    Thread.currentThread().sleep(100000000);
-  }
+	private void start(String chainCode, String channelName, String org, User user) throws CryptoException,
+			InvalidArgumentException, IllegalAccessException, InstantiationException, ClassNotFoundException,
+			NoSuchMethodException, InvocationTargetException, TransactionException, IOException, InterruptedException {
+		ChannelUtil util = new ChannelUtil();
+		HFClient client = HFClient.createNewInstance();
+		client.setCryptoSuite(CryptoSuite.Factory.getCryptoSuite());
+		client.setUserContext(user);
+//    
+//    Channel channel = util.reconstructChannel(org, channelName, client);
+//    String eventName = channel.registerChaincodeEventListener(Pattern.compile(".*"), Pattern.compile(Pattern.quote("event")), this);
+//    Thread.currentThread().sleep(100000000);
+	}
 
-  @Override
-  public void received(String handle, BlockEvent blockEvent, ChaincodeEvent chaincodeEvent) {
-    System.out.println("Event received. Happens when transaction is ordered !");
-    System.out.println("payload" + new String(chaincodeEvent.getPayload()));
-    System.out.println("event name:" + new String(chaincodeEvent.getEventName()));
-    
-    
-  }
+	@Override
+	public void received(String handle, BlockEvent blockEvent, ChaincodeEvent chaincodeEvent) {
+		System.out.println("Event received. Happens when transaction is ordered !");
+		System.out.println("payload" + new String(chaincodeEvent.getPayload()));
+		System.out.println("event name:" + new String(chaincodeEvent.getEventName()));
 
-  
+	}
+
 }

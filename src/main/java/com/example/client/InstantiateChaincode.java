@@ -12,7 +12,6 @@
  *  DO NOT USE IN PROJECTS , NOT for use in production
  */
 
-
 package com.example.client;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -22,6 +21,7 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
 
@@ -45,94 +45,99 @@ import com.example.client.impl.UserFileSystem;
 
 public class InstantiateChaincode {
 
-  public static void main(String[] args) throws CryptoException, InvalidArgumentException, IllegalAccessException,
-      InstantiationException, ClassNotFoundException, NoSuchMethodException, InvocationTargetException,
-      TransactionException, IOException, ProposalException, ChaincodeEndorsementPolicyParseException {
+	public static void main(String[] args) throws CryptoException, InvalidArgumentException, IllegalAccessException,
+			InstantiationException, ClassNotFoundException, NoSuchMethodException, InvocationTargetException,
+			TransactionException, IOException, ProposalException, ChaincodeEndorsementPolicyParseException {
 
-    String chaincodeName = StaticConfig.CHAIN_CODE_ID;
-    String channelName = StaticConfig.CHANNEL_NAME;
-    int version = 1;
-    String org = "maple";
-    boolean isUpgrade = false;
-    InstantiateChaincode instantiate = new InstantiateChaincode();
-    User user = new UserFileSystem("Admin", org + ".funds.com");
-    String[] params = new String[] { "Alice", "500", "Bob", "500" };
-    instantiate.instantiate(chaincodeName, channelName, org, version, user, params, isUpgrade);
+		String chaincodeName = StaticConfig.CHAIN_CODE_ID;
+		String channelName = StaticConfig.CHANNEL_NAME;
+		int version = 1;
+		String org = "maple";
+		InstantiateChaincode instantiate = new InstantiateChaincode();
+		User user = new UserFileSystem("Admin", org + ".funds.com");
+		String[] params = new String[] { "Alice", "500", "Bob", "500" };
+		Collection<String> peers = new HashSet<>();
+		peers.add(StaticConfig.DISCOVER_PEER_MAPLE);
+		instantiate.instantiate(chaincodeName, channelName, peers, version, user, params);
 
-  }
+	}
 
-  protected void instantiate(String chaincodeName, String channelName, String org, int version, User user,
-      String[] params, boolean isUpgrade) throws InvalidArgumentException, TransactionException, IOException, CryptoException,
-      IllegalAccessException, InstantiationException, ClassNotFoundException, NoSuchMethodException,
-      InvocationTargetException, ChaincodeEndorsementPolicyParseException, ProposalException {
-    HFClient client = HFClient.createNewInstance();
-    client.setCryptoSuite(CryptoSuite.Factory.getCryptoSuite());
-    client.setUserContext(user);
-    ChannelUtil util = new ChannelUtil();
-    Channel channel = util.reconstructChannel(org, channelName, client);
+	protected void instantiate(String chaincodeName, String channelID, Collection<String> peers, int version, User user,
+			String[] params) throws InvalidArgumentException, TransactionException, IOException, CryptoException,
+			IllegalAccessException, InstantiationException, ClassNotFoundException, NoSuchMethodException,
+			InvocationTargetException, ChaincodeEndorsementPolicyParseException, ProposalException {
+		HFClient client = HFClient.createNewInstance();
+		client.setCryptoSuite(CryptoSuite.Factory.getCryptoSuite());
+		client.setUserContext(user);
+		ChannelUtil util = new ChannelUtil();
+		Channel channel = util.reconstructChannelServiceDiscovery(channelID, (String) peers.toArray()[0], client);
 
-    ChaincodeID chaincodeID;
-    Collection<ProposalResponse> responses;
-    Collection<ProposalResponse> successful = new LinkedList<>();
-    Collection<ProposalResponse> failed = new LinkedList<>();
+		ChaincodeID chaincodeID;
+		Collection<ProposalResponse> responses;
+		Collection<ProposalResponse> successful = new LinkedList<>();
+		Collection<ProposalResponse> failed = new LinkedList<>();
 
-    chaincodeID = ChaincodeID.newBuilder().setName(chaincodeName).setVersion(String.valueOf(version)).build();
-    if (isUpgrade) {
-      UpgradeProposalRequest upgrade = client.newUpgradeProposalRequest();
-      upgrade.setChaincodeID(chaincodeID);
-      upgrade.setProposalWaitTime(60000);
-      upgrade.setFcn("init");
-      upgrade.setChaincodeName(chaincodeName);
-      upgrade.setChaincodeVersion(String.valueOf(version));
-      Map<String, byte[]> tm = new HashMap<>();
-      tm.put("HyperLedgerFabric", "UpgradeProposalRequest:JavaSDK".getBytes(UTF_8));
-      tm.put("method", "UpgradeProposalRequest".getBytes(UTF_8));
-      upgrade.setTransientMap(tm);
-      upgrade.setArgs(params);
+		Collection<String> chainCodes = channel.getDiscoveredChaincodeNames();
 
-      ChaincodeEndorsementPolicy chaincodeEndorsementPolicy = new ChaincodeEndorsementPolicy();
-      chaincodeEndorsementPolicy.fromYamlFile(new File("./store/endorsement/chaincodeendorsementpolicy.yaml"));
-      upgrade.setChaincodeEndorsementPolicy(chaincodeEndorsementPolicy);
-      responses = channel.sendUpgradeProposal(upgrade, channel.getPeers());
-    } else {
+		boolean isUpgrade = chainCodes.contains(chaincodeName);
 
-      InstantiateProposalRequest instantiateProposalRequest = client.newInstantiationProposalRequest();
-      instantiateProposalRequest.setProposalWaitTime(60000);
-      instantiateProposalRequest.setChaincodeID(chaincodeID);
-      instantiateProposalRequest.setFcn("init");
-      instantiateProposalRequest.setChaincodeVersion(String.valueOf(version));
-      instantiateProposalRequest.setChaincodeName(chaincodeName);
+		chaincodeID = ChaincodeID.newBuilder().setName(chaincodeName).setVersion(String.valueOf(version)).build();
+		if (isUpgrade) {
+			UpgradeProposalRequest upgrade = client.newUpgradeProposalRequest();
+			upgrade.setChaincodeID(chaincodeID);
+			upgrade.setProposalWaitTime(60000);
+			upgrade.setFcn("init");
+			upgrade.setChaincodeName(chaincodeName);
+			upgrade.setChaincodeVersion(String.valueOf(version));
+			Map<String, byte[]> tm = new HashMap<>();
+			tm.put("HyperLedgerFabric", "UpgradeProposalRequest:JavaSDK".getBytes(UTF_8));
+			tm.put("method", "UpgradeProposalRequest".getBytes(UTF_8));
+			upgrade.setTransientMap(tm);
+			upgrade.setArgs(params);
 
-      instantiateProposalRequest.setArgs(params);
-      Map<String, byte[]> tm = new HashMap<>();
-      tm.put("HyperLedgerFabric", "InstantiateProposalRequest:JavaSDK".getBytes(UTF_8));
-      tm.put("method", "InstantiateProposalRequest".getBytes(UTF_8));
-      instantiateProposalRequest.setTransientMap(tm);
+			ChaincodeEndorsementPolicy chaincodeEndorsementPolicy = new ChaincodeEndorsementPolicy();
+			chaincodeEndorsementPolicy.fromYamlFile(new File("./store/endorsement/chaincodeendorsementpolicy.yaml"));
+			upgrade.setChaincodeEndorsementPolicy(chaincodeEndorsementPolicy);
+			responses = channel.sendUpgradeProposal(upgrade, channel.getPeers());
+		} else {
 
-      ChaincodeEndorsementPolicy chaincodeEndorsementPolicy = new ChaincodeEndorsementPolicy();
-      chaincodeEndorsementPolicy.fromYamlFile(new File("./store/endorsement/chaincodeendorsementpolicy.yaml"));
-      instantiateProposalRequest.setChaincodeEndorsementPolicy(chaincodeEndorsementPolicy);
+			InstantiateProposalRequest instantiateProposalRequest = client.newInstantiationProposalRequest();
+			instantiateProposalRequest.setProposalWaitTime(60000);
+			instantiateProposalRequest.setChaincodeID(chaincodeID);
+			instantiateProposalRequest.setFcn("init");
+			instantiateProposalRequest.setChaincodeVersion(String.valueOf(version));
+			instantiateProposalRequest.setChaincodeName(chaincodeName);
 
-      responses = channel.sendInstantiationProposal(instantiateProposalRequest, channel.getPeers());
-    }
+			instantiateProposalRequest.setArgs(params);
+			Map<String, byte[]> tm = new HashMap<>();
+			tm.put("HyperLedgerFabric", "InstantiateProposalRequest:JavaSDK".getBytes(UTF_8));
+			tm.put("method", "InstantiateProposalRequest".getBytes(UTF_8));
+			instantiateProposalRequest.setTransientMap(tm);
 
-    for (ProposalResponse response : responses) {
-      if (response.isVerified() && response.getStatus() == ProposalResponse.Status.SUCCESS) {
-        successful.add(response);
-        System.out.println("SUCCESS-------------------------------------->");
-      } else {
-        failed.add(response);
-        System.out.println("ERROR-------------------------------------->");
-      }
-    }
+			ChaincodeEndorsementPolicy chaincodeEndorsementPolicy = new ChaincodeEndorsementPolicy();
+			chaincodeEndorsementPolicy.fromYamlFile(new File("./store/endorsement/chaincodeendorsementpolicy.yaml"));
+			instantiateProposalRequest.setChaincodeEndorsementPolicy(chaincodeEndorsementPolicy);
 
-    if (failed.size() > 0) {
-      ProposalResponse first = failed.iterator().next();
-    } else {
-      // send the transaction to ordering
-      channel.sendTransaction(successful);
-    }
-    System.out.println("DONE=>>>>>>>>>>>>>>>>>>>>>>>>>");
-  }
+			responses = channel.sendInstantiationProposal(instantiateProposalRequest, channel.getPeers());
+		}
+
+		for (ProposalResponse response : responses) {
+			if (response.isVerified() && response.getStatus() == ProposalResponse.Status.SUCCESS) {
+				successful.add(response);
+				System.out.println("SUCCESS-------------------------------------->");
+			} else {
+				failed.add(response);
+				System.out.println("ERROR-------------------------------------->");
+			}
+		}
+
+		if (failed.size() > 0) {
+			ProposalResponse first = failed.iterator().next();
+		} else {
+			// send the transaction to ordering
+			channel.sendTransaction(successful);
+		}
+		System.out.println("DONE=>>>>>>>>>>>>>>>>>>>>>>>>>");
+	}
 
 }

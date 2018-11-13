@@ -1,0 +1,77 @@
+buildscript {
+	repositories {
+		mavenCentral()
+		maven {
+			url "https://plugins.gradle.org/m2/"
+		}
+	}
+	dependencies {
+		classpath "org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}"
+		classpath "net.ltgt.gradle:gradle-apt-plugin:0.19"
+	}
+}
+
+apply plugin: 'java'
+apply plugin: 'eclipse'
+apply plugin: 'org.springframework.boot'
+apply plugin: 'io.spring.dependency-management'
+apply plugin: 'war'
+apply plugin: 'net.ltgt.apt'
+
+configurations {
+	all {
+		exclude group: 'org.springframework.boot', module: 'spring-boot-starter-logging'
+	}
+
+	developmentOnly
+	runtimeClasspath {
+		extendsFrom developmentOnly
+	}
+}
+
+
+repositories {
+	mavenCentral()
+	maven {
+		url 'https://oss.sonatype.org/content/repositories/snapshots'
+	}
+}
+
+dependencies {
+
+  	implementation("org.hyperledger.fabric-sdk-java:fabric-sdk-java:${fabricSdkVersion}") {
+      	exclude group: 'com.google.guava', module: 'guava'
+      //workaround the guava version mix from HF java sdk pom
+    }
+  	implementation "com.google.guava:guava:${guavaVersion}"
+  
+  	implementation "org.springframework:spring-beans:${project.getProperty('spring.version')}"
+  	implementation "org.springframework:spring-context:${project.getProperty('spring.version')}"
+  	implementation "org.hibernate.validator:hibernate-validator:${hibernateValidatorVersion}"
+  
+  	implementation "org.slf4j:slf4j-api:${slf4jVersion}"
+  	implementation "org.slf4j:log4j-over-slf4j:${slf4jVersion}"
+  	implementation "org.apache.commons:commons-lang3:${commonsLangVersion}"
+  	implementation "org.apache.commons:commons-collections4:${commonsCollectionsVersion}"
+  
+  	testImplementation "junit:junit:${junitVersion}"
+  	testImplementation "org.springframework:spring-test:${project.getProperty('spring.version')}"
+  	testImplementation "org.mockito:mockito-all:${mockitoVersion}"
+
+
+	implementation "org.springframework.boot:spring-boot-starter-security:${springBootVersion}"
+	implementation "org.springframework.boot:spring-boot-starter-web:${springBootVersion}"
+	implementation "org.springframework.boot:spring-boot-starter-log4j2:${springBootVersion}"
+	implementation "org.springframework.boot:spring-boot-starter-actuator:${springBootVersion}"
+	
+ 	implementation "org.apache.commons:commons-lang3:${commonsLangVersion}"
+	
+	providedRuntime "org.springframework.boot:spring-boot-starter-tomcat:${springBootVersion}"
+	
+	testImplementation "org.springframework.boot:spring-boot-starter-test:${springBootVersion}"
+	testImplementation "org.springframework.security:spring-security-test"
+
+	
+	developmentOnly "org.springframework.boot:spring-boot-devtools:${springBootVersion}"
+	
+}

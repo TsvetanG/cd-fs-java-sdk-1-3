@@ -16,272 +16,162 @@ package com.example.client.impl;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map.Entry;
+import java.util.EnumSet;
 import java.util.Properties;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.io.IOUtils;
 import org.hyperledger.fabric.sdk.Channel;
 import org.hyperledger.fabric.sdk.ChannelConfiguration;
 import org.hyperledger.fabric.sdk.EventHub;
 import org.hyperledger.fabric.sdk.HFClient;
 import org.hyperledger.fabric.sdk.Orderer;
 import org.hyperledger.fabric.sdk.Peer;
+import org.hyperledger.fabric.sdk.Peer.PeerRole;
 import org.hyperledger.fabric.sdk.User;
 import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
 import org.hyperledger.fabric.sdk.exception.TransactionException;
+import org.springframework.util.StringUtils;
 
 public class ChannelUtil {
 
-  public ChannelUtil() {
-    // Properties to set longer wiat time for the event hub
-    System.setProperty("org.hyperledger.fabric.sdk.eventhub_connection.wait_time", "10000");
-  }
+	public Channel reconstructChannelServiceDiscovery(String channelID, String discoveryPeer, HFClient client)
+			throws FileNotFoundException, InvalidArgumentException, TransactionException, IOException {
+		Peer peer = null;
+		if (discoveryPeer != null) {
+			peer = createPeer(client, discoveryPeer);
+		}
 
-  /**
-   * Re cosntructs sdk channel object
-   * 
-   * @param channelName
-   * @param client
-   * @param org
-   * @return
-   * @throws TransactionException
-   * @throws InvalidArgumentException
-   */
-  protected Channel reconstructChannel(String channelName, HFClient client, List<Peer> peers, List<Orderer> orderers,
-      List<EventHub> hubs) throws InvalidArgumentException, TransactionException {
+		return reconstructChannelServiceDiscovery(channelID, peer, client);
+	}
 
-    Channel channel = client.newChannel(channelName);
+	public Channel reconstructChannelServiceDiscovery(String channelID, Peer discoveryPeer, HFClient client)
+			throws FileNotFoundException, IOException, InvalidArgumentException, TransactionException {
+		Channel channel;
+		try {
+			channel = client.newChannel(channelID);
+		} catch (InvalidArgumentException e) {
+			throw new RuntimeException("Could not create a new channel", e);
+		} // create channel that will be discovered.
+		if (discoveryPeer != null) {
 
-    for (Orderer orderer : orderers) { // add remaining orderers if any.
-      channel.addOrderer(orderer);
-    }
+			try {
+				channel.addPeer(discoveryPeer,
+						Channel.PeerOptions.createPeerOptions().setPeerRoles(EnumSet.of(PeerRole.SERVICE_DISCOVERY,
+								PeerRole.LEDGER_QUERY, PeerRole.EVENT_SOURCE, PeerRole.CHAINCODE_QUERY)));
+				channel.setServiceDiscoveryProperties(getServiceDiscoveryProps(client.getUserContext().getName(),
+						client.getUserContext().getMspId()));
+			} catch (InvalidArgumentException e) {
+				throw new RuntimeException("Could not add peer to channel", e);
+			}
+		}
 
-    for (EventHub hub : hubs) {
-      channel.addEventHub(hub);
-    }
-    for (Peer peer : peers) {
-      channel.addPeer(peer);
-    }
-    channel.setTransactionWaitTime(50000);
-    channel.initialize();
+		channel.initialize();
 
-    return channel;
+		return channel;
+	}
 
-  }
+	/**
+	 * @return
+	 * @throws IOException
+	 * @throws FileNotFoundException
+	 */
+	private Properties getServiceDiscoveryProps(String userName, String orgName)
+			throws FileNotFoundException, IOException {
+		Properties sdprops = new Properties();
+		sdprops.put("org.hyperledger.fabric.sdk.discovery.default.clientCertBytes",
+				IOUtils.toByteArray(new FileInputStream(new File("./store/crypto-config/peerOrganizations/" + orgName
+						+ "/users/" + userName + "/tls/client.crt"))));
 
-  public Channel reconstructChannel(String org, String channelName, String peerName, HFClient client)
-      throws IOException, InvalidArgumentException, TransactionException {
-    Properties props = new Properties();
-    FileInputStream fis = new FileInputStream(
-        new File("./store/channels/" + channelName + "/" + channelName + ".prop"));
+		sdprops.put("org.hyperledger.fabric.sdk.discovery.default.clientKeyBytes",
+				IOUtils.toByteArray(new FileInputStream(new File("./store/crypto-config/peerOrganizations/" + orgName
+						+ "/users/" + userName + "/tls/client.key"))));
 
-    props.load(fis);
-    fis.close();
+		return sdprops;
 
-    List<Peer> peers = new ArrayList<Peer>();
-    List<Orderer> orderers = new ArrayList<Orderer>();
-    List<EventHub> hubs = new ArrayList<EventHub>();
+	}
 
-    add(org, peerName, client, props, peers, orderers, hubs);
+	protected Properties getOrdererProps(String name) {
+		return getProps("orderer", name);
+	}
 
-    return reconstructChannel(channelName, client, peers, orderers, hubs);
-  }
+	protected Properties getPeerProps(String name) {
+		return getProps("peer", name);
+	}
 
-  public Channel reconstructChannel(String org, String channelName, HFClient client)
-      throws IOException, InvalidArgumentException, TransactionException {
-    Properties props = new Properties();
-    FileInputStream fis = new FileInputStream(
-        new File("./store/channels/" + channelName + "/" + channelName + ".prop"));
+	protected Properties getProps(String type, String name) {
+		String orgName = getOrgName(name);
+		File cert = null;
+		if ("peer".equals(type)) {
+			cert = new File(
+					"./store/crypto-config/peerOrganizations/" + orgName + "/peers/" + name + "/tls/server.crt");
+		} else {
+			cert = new File(
+					"./store/crypto-config/ordererOrganizations/" + orgName + "/orderers/" + name + "/tls/server.crt");
+		}
 
-    props.load(fis);
-    fis.close();
+		if (!cert.exists()) {
+			throw new RuntimeException("Missing certificate file ");
+		}
 
-    List<Peer> peers = new ArrayList<Peer>();
-    List<Orderer> orderers = new ArrayList<Orderer>();
-    List<EventHub> hubs = new ArrayList<EventHub>();
+		Properties props = new Properties();
+		props.setProperty("pemFile", cert.getAbsolutePath());
+		// ret.setProperty("trustServerCertificate", "true"); //testing environment only
+		// NOT FOR PRODUCTION!
+		props.setProperty("hostnameOverride", name);
+		props.setProperty("sslProvider", "openSSL");
+		props.setProperty("negotiationType", "TLS");
+		if ("orderer".equals(type)) {
+			props.put("ordererWaitTimeMilliSecs", "10000");
+		}
+		props.put("grpc.NettyChannelBuilderOption.keepAliveTime", new Object[] { 5L, TimeUnit.MINUTES });
+		props.put("grpc.NettyChannelBuilderOption.keepAliveTimeout", new Object[] { 8L, TimeUnit.SECONDS });
+		props.put("grpc.NettyChannelBuilderOption.keepAliveWithoutCalls", new Object[] { true });
+		return props;
+	}
 
-    add(org, null, client, props, peers, orderers, hubs);
+	private String getOrgName(String name) {
+		int index = name.indexOf(".");
+		return name.substring(index + 1);
+	}
 
-    return reconstructChannel(channelName, client, peers, orderers, hubs);
-  }
+	public EventHub createHub(HFClient client, String value) throws InvalidArgumentException {
+		String[] split = split(value);
+		return client.newEventHub(split[0], split[1], getPeerProps(split[0]));
+	}
 
-  protected void add(String org, String peerName, HFClient client, Properties props, List<Peer> peers,
-      List<Orderer> orderers, List<EventHub> hubs) throws InvalidArgumentException {
+	public Peer createPeer(HFClient client, String value) throws InvalidArgumentException {
+		String[] split = split(value);
+		return client.newPeer(split[0], split[1], getPeerProps(split[0]));
+	}
 
-    String value;
-    String key;
-    String[] keySplit;
-    Set<Entry<Object, Object>> set = props.entrySet();
+	public Orderer createOrderer(HFClient client, String value) throws InvalidArgumentException {
+		String[] split = split(value);
+		return client.newOrderer(split[0], split[1], getOrdererProps(split[0]));
+	}
 
-    for (Entry<Object, Object> entry : set) {
-      key = entry.getKey().toString();
-      keySplit = key.split("\\.");
-      if (!org.equals(keySplit[1])) {
-        continue;
-      }
-      value = entry.getValue().toString();
-      switch (keySplit[0]) {
-      case "peer":
-        if (peerName == null || peerName.equals(split(value)[0])) {
-          peers.add(createPeer(client, value));
-        }
-        break;
-      case "orderer":
-        orderers.add(createOrderer(client, value));
-        break;
-      case "hub":
-        if (peerName == null || peerName.equals(split(value)[0])) {
-          hubs.add(createHub(client, value));
-        }
-        break;
+	protected String[] split(String str) {
+		return StringUtils.split(str, ":");
+	}
 
-      default:
-        break;
-      }
-    }
-  }
+	public Channel createNewChannel(String ordererPath, String pathToConfigTX, String channelName, String org,
+			HFClient client) throws IOException, InvalidArgumentException, TransactionException {
 
-  protected Properties getOrdererProps(String name) {
-    return getProps("orderer", name);
-  }
+		Orderer orderer = createOrderer(client, ordererPath);
 
-  protected Properties getPeerProps(String name) {
-    return getProps("peer", name);
-  }
+		Channel channel = createNewChannel(pathToConfigTX, channelName, client, orderer, client.getUserContext());
+		return channel;
+	}
 
-  protected Properties getProps(String type, String name) {
-    String orgName = getOrgName(name);
-    File cert = null;
-    if ("peer".equals(type)) {
-      cert = new File("./store/crypto-config/peerOrganizations/" + orgName + "/peers/" + name + "/tls/server.crt");
-    } else {
-      cert = new File(
-          "./store/crypto-config/ordererOrganizations/" + orgName + "/orderers/" + name + "/tls/server.crt");
-    }
+	protected Channel createNewChannel(String pathToConfigTX, String channelName, HFClient client, Orderer orderer,
+			User user) throws TransactionException, InvalidArgumentException, IOException {
 
-    if (!cert.exists()) {
-      throw new RuntimeException("Missing certificate file ");
-    }
-
-    Properties props = new Properties();
-    props.setProperty("pemFile", cert.getAbsolutePath());
-    // ret.setProperty("trustServerCertificate", "true"); //testing environment only
-    // NOT FOR PRODUCTION!
-    props.setProperty("hostnameOverride", name);
-    props.setProperty("sslProvider", "openSSL");
-    props.setProperty("negotiationType", "TLS");
-    if ("orderer".equals(type)) {
-      props.put("ordererWaitTimeMilliSecs", "10000");
-    }
-    props.put("grpc.NettyChannelBuilderOption.keepAliveTime", new Object[] { 5L, TimeUnit.MINUTES });
-    props.put("grpc.NettyChannelBuilderOption.keepAliveTimeout", new Object[] { 8L, TimeUnit.SECONDS });
-    props.put("grpc.NettyChannelBuilderOption.keepAliveWithoutCalls", new Object[] { true });
-    return props;
-  }
-
-  private String getOrgName(String name) {
-    int index = name.indexOf(".");
-    return name.substring(index + 1);
-  }
-
-  public EventHub createHub(HFClient client, String value) throws InvalidArgumentException {
-    String[] split = split(value);
-    return client.newEventHub(split[0], split[1], getPeerProps(split[0]));
-  }
-
-  public Peer createPeer(HFClient client, String value) throws InvalidArgumentException {
-    String[] split = split(value);
-    return client.newPeer(split[0], split[1], getPeerProps(split[0]));
-  }
-
-  protected Orderer createOrderer(HFClient client, String value) throws InvalidArgumentException {
-    String[] split = split(value);
-    return client.newOrderer(split[0], split[1], getOrdererProps(split[0]));
-  }
-
-  protected String[] split(String str) {
-    int index = str.indexOf(":");
-    return new String[] { str.substring(0, index), str.substring(index + 1) };
-  }
-
-  public Channel createNewChannel(String ordererPath, String pathToConfigTX, String channelName, String org,
-      HFClient client) throws IOException, InvalidArgumentException, TransactionException {
-
-    Orderer orderer = createOrderer(client, ordererPath);
-
-    if (orderer == null) {
-      throw new RuntimeException("Orderer not found in channel create property file");
-    }
-
-    storeNewChannel(channelName, ordererPath, org);
-
-    Channel channel = createNewChannel(pathToConfigTX, channelName, client, orderer, client.getUserContext());
-    return channel;
-  }
-
-  protected void storeNewChannel(String channelName, String ordererPath, String org) throws IOException {
-    File file = new File("./store/channels/" + channelName);
-    if (!file.exists()) {
-      file.mkdirs();
-    }
-
-    File propFile = new File(file, channelName + ".prop");
-    Properties props = new Properties();
-    if (propFile.exists()) {
-      FileInputStream fis = new FileInputStream(propFile);
-      props.load(fis);
-      fis.close();
-    }
-
-    props.setProperty("orderer." + org + ".0", ordererPath);
-
-    FileOutputStream out = new FileOutputStream(propFile);
-    props.store(out, null);
-    out.close();
-
-  }
-
-  protected Channel createNewChannel(String pathToConfigTX, String channelName, HFClient client, Orderer orderer,
-      User user) throws TransactionException, InvalidArgumentException, IOException {
-
-    ChannelConfiguration channelConfiguration = new ChannelConfiguration(new File(pathToConfigTX));
-    Channel newChannel = client.newChannel(channelName, orderer, channelConfiguration,
-        client.getChannelConfigurationSignature(channelConfiguration, user));
-    return newChannel;
-  }
-
-  public void updateChannelProps(String channelName, String org, String peerPath, String eventHub) throws IOException {
-    Properties props = new Properties();
-    File propFile = new File("./store/channels/" + channelName + "/" + channelName + ".prop");
-    FileInputStream fis = new FileInputStream(propFile);
-
-    props.load(fis);
-    fis.close();
-
-    int i = 0;
-    String key = null;
-    String value = null;
-    while (true) {
-      key = "peer." + org + "." + i;
-      value = props.getProperty(key);
-      if (value == null) {
-        key = org + "." + i;
-        break;
-      }
-      ++i;
-    }
-
-    props.setProperty("peer." + key, peerPath);
-    props.setProperty("hub." + key, eventHub);
-    FileOutputStream out = new FileOutputStream(propFile);
-    props.store(out, null);
-    out.close();
-
-  }
+		ChannelConfiguration channelConfiguration = new ChannelConfiguration(new File(pathToConfigTX));
+		Channel newChannel = client.newChannel(channelName, orderer, channelConfiguration,
+				client.getChannelConfigurationSignature(channelConfiguration, user));
+		return newChannel;
+	}
 
 }

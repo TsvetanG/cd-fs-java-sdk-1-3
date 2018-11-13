@@ -19,7 +19,9 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 
 import org.hyperledger.fabric.sdk.Channel;
+import org.hyperledger.fabric.sdk.Channel.PeerOptions;
 import org.hyperledger.fabric.sdk.HFClient;
+import org.hyperledger.fabric.sdk.Orderer;
 import org.hyperledger.fabric.sdk.Peer;
 import org.hyperledger.fabric.sdk.User;
 import org.hyperledger.fabric.sdk.exception.CryptoException;
@@ -33,38 +35,41 @@ import com.example.client.impl.UserFileSystem;
 
 public class JoinChannel {
 
-  public static void main(String[] args) throws CryptoException, InvalidArgumentException, IllegalAccessException, InstantiationException, ClassNotFoundException, NoSuchMethodException, InvocationTargetException, TransactionException, IOException, ProposalException {
- 
-    /**
-     * For the correct ports check docker-compose-base.yaml
-     */
-    String channelName = StaticConfig.CHANNEL_NAME;
-    String org = "maple"; 
-    String portClient = "7051";// for fundinc 9051
-    String portEventHub = "7053"; // for fuindinc 9053
-    
-    String peer = "peer0." + org + ".funds.com:" + StaticConfig.GRPC_HOST + ":" + portClient;
-    String eventHub = "peer0." + org + ".funds.com:" + StaticConfig.GRPC_HOST + ":" + portEventHub;
-    JoinChannel join = new JoinChannel();
-    User user = new UserFileSystem("Admin", org + ".funds.com"); 
-    join.join(channelName, peer, eventHub, org, user);
+	public static void main(String[] args) throws CryptoException, InvalidArgumentException, IllegalAccessException,
+			InstantiationException, ClassNotFoundException, NoSuchMethodException, InvocationTargetException,
+			TransactionException, IOException, ProposalException {
 
-  }
+		/**
+		 * For the correct ports check docker-compose-base.yaml
+		 */
+		String channelName = StaticConfig.CHANNEL_NAME;
+		String org = "maple";
+		String portClient = "7051";// for fundinc 9051
 
-  protected void join(String channelName, String peerPath ,String eventHub, String org, User user) throws CryptoException, InvalidArgumentException, IllegalAccessException, InstantiationException, ClassNotFoundException, NoSuchMethodException, InvocationTargetException, TransactionException, IOException, ProposalException {
-    ChannelUtil util = new ChannelUtil();
-    HFClient client = HFClient.createNewInstance();
-    client.setCryptoSuite(CryptoSuite.Factory.getCryptoSuite());
-    client.setUserContext(user);
-    
-    Channel channel = util.reconstructChannel(org, channelName, client);
-    Peer peer = util.createPeer(client, peerPath);
-    channel = channel.joinPeer(peer);
-    
-    util.updateChannelProps( channelName , org, peerPath, eventHub);
-    System.out.println("DONE>>>>>>>");
-    
-  }
+		String peer = "peer0." + org + ".fund.com:" + StaticConfig.GRPC_HOST + ":" + portClient;
+		JoinChannel join = new JoinChannel();
+		User user = new UserFileSystem("Admin", org + ".fund.com");
+		join.join(channelName, StaticConfig.ORDERER, peer, user);
 
+	}
+
+	protected void join(String channelID, String ordererName, String peerName, User user) throws CryptoException,
+			InvalidArgumentException, IllegalAccessException, InstantiationException, ClassNotFoundException,
+			NoSuchMethodException, InvocationTargetException, TransactionException, IOException, ProposalException {
+		ChannelUtil util = new ChannelUtil();
+		HFClient client = HFClient.createNewInstance();
+		client.setCryptoSuite(CryptoSuite.Factory.getCryptoSuite());
+		client.setUserContext(user);
+
+		Channel channel = client.newChannel(channelID);
+		Peer peer = util.createPeer(client, peerName);
+		Orderer orderer = util.createOrderer(client, ordererName);
+		channel.addOrderer(orderer);
+
+		channel = channel.joinPeer(orderer, peer, PeerOptions.createPeerOptions());
+
+		System.out.println("DONE>>>>>>>");
+
+	}
 
 }
