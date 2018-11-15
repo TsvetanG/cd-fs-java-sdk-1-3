@@ -54,7 +54,7 @@ public class CreateChannel {
 		String orderer = StaticConfig.ORDERER;
 		String pathToConfigTX = "./store/channels/" + channelName + ".tx";
 		CreateChannel create = new CreateChannel();
-		User user = new UserFileSystem("Admin", "maple.fund.com");
+		User user = new UserFileSystem("Admin",  org + ".fund.com");
 		create.create(orderer, channelName, pathToConfigTX, org, user);
 
 	}
