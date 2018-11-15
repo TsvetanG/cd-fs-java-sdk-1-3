@@ -18,10 +18,12 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
+import java.util.regex.Pattern;
 
 import org.hyperledger.fabric.sdk.BlockEvent;
 import org.hyperledger.fabric.sdk.ChaincodeEvent;
 import org.hyperledger.fabric.sdk.ChaincodeEventListener;
+import org.hyperledger.fabric.sdk.Channel;
 import org.hyperledger.fabric.sdk.HFClient;
 import org.hyperledger.fabric.sdk.User;
 import org.hyperledger.fabric.sdk.exception.CryptoException;
@@ -43,12 +45,12 @@ public class EventChaincode implements ChaincodeEventListener {
 		String channelName = StaticConfig.CHANNEL_NAME;
 		String chainCode = StaticConfig.CHAIN_CODE_ID;
 		String org = "maple";
-		User user = new UserFileSystem("Admin", "maple.funds.com");
-		new EventChaincode().start(chainCode, channelName, org, user);
+		User user = new UserFileSystem("Admin", "maple.fund.com");
+		new EventChaincode().start(chainCode, channelName, org, StaticConfig.DISCOVER_PEER_MAPLE, user);
 		System.out.println("DONE ->>>>>>>>>>>>>>>");
 	}
 
-	private void start(String chainCode, String channelName, String org, User user) throws CryptoException,
+	private void start(String chainCode, String channelName, String org, String peerName, User user) throws CryptoException,
 			InvalidArgumentException, IllegalAccessException, InstantiationException, ClassNotFoundException,
 			NoSuchMethodException, InvocationTargetException, TransactionException, IOException, InterruptedException {
 		ChannelUtil util = new ChannelUtil();
@@ -56,9 +58,12 @@ public class EventChaincode implements ChaincodeEventListener {
 		client.setCryptoSuite(CryptoSuite.Factory.getCryptoSuite());
 		client.setUserContext(user);
 //    
-//    Channel channel = util.reconstructChannel(org, channelName, client);
-//    String eventName = channel.registerChaincodeEventListener(Pattern.compile(".*"), Pattern.compile(Pattern.quote("event")), this);
-//    Thread.currentThread().sleep(100000000);
+    Channel channel = client.newChannel(channelName);
+    channel.addPeer(util.createPeer(client, peerName)); 
+    channel.initialize();
+    String eventName = channel.registerChaincodeEventListener(Pattern.compile("transfercc"), Pattern.compile(Pattern.quote("event")), this);
+    System.out.println("Sleeping");
+    Thread.currentThread().sleep(100000000);
 	}
 
 	@Override

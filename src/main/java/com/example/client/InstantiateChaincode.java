@@ -149,12 +149,9 @@ public class InstantiateChaincode {
 			Collection<Orderer> orderers = new HashSet<>();
 			orderers.add(ordering);
 			channel.addOrderer(ordering);
-			try {
-				channel.sendTransaction(successful, orderers).get(120, TimeUnit.SECONDS);
-			} catch (TimeoutException e) {
-				throw new RuntimeException(e);
-			}
+			channel.sendTransaction(successful, orderers);
 		}
+			
 		System.out.println("DONE=>>>>>>>>>>>>>>>>>>>>>>>>>");
 	}
 
