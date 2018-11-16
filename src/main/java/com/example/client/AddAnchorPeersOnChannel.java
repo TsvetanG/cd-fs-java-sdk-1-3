@@ -18,10 +18,10 @@ public class AddAnchorPeersOnChannel {
 		 * For the correct ports check docker-compose-base.yaml
 		 */
 		String channelName = StaticConfig.CHANNEL_NAME;
-		String org = "maple";
+		String org = "maple";//fundinc
 		String portClient = "7051";// for fundinc 9051
 		
-		String anchorPeer = "peer0." + org + ".fund.com:" + portClient;
+		String anchorPeer = "peer0." + org + ".fund.com:7051";
 
 		String discoveryPeer = "peer0." + org + ".fund.com:" + StaticConfig.GRPC_HOST + ":" + portClient;
 		AddAnchorPeersOnChannel updateChannel = new AddAnchorPeersOnChannel();
@@ -42,9 +42,9 @@ public class AddAnchorPeersOnChannel {
 		Peer peer = null;
 		for(Peer dpeer : channel.getPeers() ) {
 			System.out.println("discovered peer: " + dpeer.getName() + " url: " + dpeer.getUrl());
-			if (anchorPeer.contains(dpeer.getName()) && discoveryPeer.contains(dpeer.getUrl())) {
+			if (anchorPeer.equals(dpeer.getName()) && discoveryPeer.contains(dpeer.getUrl())) {
 				peer = dpeer;
-//				break;
+				break;
 			}
 		}
 		

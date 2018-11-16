@@ -16,16 +16,13 @@ package com.example.client;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.TimeUnit;
 
 import javax.servlet.http.HttpServletResponse;
 
@@ -36,13 +33,9 @@ import org.hyperledger.fabric.sdk.ChaincodeID;
 import org.hyperledger.fabric.sdk.Channel;
 import org.hyperledger.fabric.sdk.HFClient;
 import org.hyperledger.fabric.sdk.Orderer;
-import org.hyperledger.fabric.sdk.Peer;
 import org.hyperledger.fabric.sdk.ProposalResponse;
+import org.hyperledger.fabric.sdk.ServiceDiscovery;
 import org.hyperledger.fabric.sdk.TransactionProposalRequest;
-import org.hyperledger.fabric.sdk.exception.CryptoException;
-import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
-import org.hyperledger.fabric.sdk.exception.ProposalException;
-import org.hyperledger.fabric.sdk.exception.TransactionException;
 import org.hyperledger.fabric.sdk.security.CryptoSuite;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -59,10 +52,7 @@ import com.example.client.impl.UserFileSystem;
 @CrossOrigin(origins = "*")
 public class InvokeChaincode implements BlockListener {
 
-	public static void main(String[] args)
-			throws CryptoException, InvalidArgumentException, TransactionException, IOException, ProposalException,
-			InterruptedException, ExecutionException, TimeoutException, IllegalAccessException, InstantiationException,
-			ClassNotFoundException, NoSuchMethodException, InvocationTargetException {
+	public static void main(String[] args) throws Exception {
 
 		String channelName = StaticConfig.CHANNEL_NAME;
 		String chainCode = StaticConfig.CHAIN_CODE_ID;
@@ -81,22 +71,13 @@ public class InvokeChaincode implements BlockListener {
 
 	public CompletableFuture<TransactionEvent> invoke(String operation, String[] params, String discoveryPeer,
 			String orderer, String channelID, String chainCode, UserFileSystem user)
-			throws CryptoException, InvalidArgumentException, TransactionException, IOException, InterruptedException,
-			ExecutionException, TimeoutException, ProposalException, IllegalAccessException, InstantiationException,
-			ClassNotFoundException, NoSuchMethodException, InvocationTargetException {
+			throws Exception {
 
 		ChannelUtil util = new ChannelUtil();
 		HFClient client = HFClient.createNewInstance();
 		client.setCryptoSuite(CryptoSuite.Factory.getCryptoSuite());
 		client.setUserContext(user);
 		Channel channel = util.reconstructChannelServiceDiscovery(channelID, discoveryPeer, client, user);
-		Collection<Peer> peersToSend = new HashSet<>();
-		for (Peer discPeer : channel.getPeers()) {
-			if (!discPeer.getUrl().contains("fund.com")) {
-				peersToSend.add(discPeer);
-				channel.registerBlockListener(this);
-			}
-		}
 
 		ChaincodeID chaincodeID;
 
@@ -105,6 +86,7 @@ public class InvokeChaincode implements BlockListener {
 		TransactionProposalRequest transactionProposalRequest = client.newTransactionProposalRequest();
 		transactionProposalRequest.setChaincodeID(chaincodeID);
 		transactionProposalRequest.setFcn(operation);
+		transactionProposalRequest.setProposalWaitTime(600000);
 		transactionProposalRequest.setArgs(params);
 
 		Map<String, byte[]> tm2 = new HashMap<>();
@@ -115,9 +97,11 @@ public class InvokeChaincode implements BlockListener {
 
 		Collection<ProposalResponse> successful = new LinkedList<>();
 		Collection<ProposalResponse> failed = new LinkedList<>();
-
-		Collection<ProposalResponse> propResponse = channel.sendTransactionProposal(transactionProposalRequest,
-				peersToSend);
+		
+		Collection<ProposalResponse> propResponse = channel.sendTransactionProposalToEndorsers(transactionProposalRequest,
+				Channel.DiscoveryOptions.createDiscoveryOptions()
+						.setEndorsementSelector(ServiceDiscovery.EndorsementSelector.ENDORSEMENT_SELECTION_RANDOM)
+						.setForceDiscovery(true));
 		for (ProposalResponse response : propResponse) {
 			if (response.getStatus() == ProposalResponse.Status.SUCCESS) {
 				successful.add(response);
@@ -138,7 +122,7 @@ public class InvokeChaincode implements BlockListener {
 		System.out.println("Sending to ordering service!");
 
 		CompletableFuture<TransactionEvent> result = channel.sendTransaction(successful, orderers);
-		Thread.currentThread().sleep(3000);
+		result.get(10, TimeUnit.SECONDS);
 		return result;
 	}
 
@@ -166,9 +150,7 @@ public class InvokeChaincode implements BlockListener {
 	@RequestMapping(value = "/invokechaincode", method = RequestMethod.POST)
 	@ResponseBody
 	public String invokeMethod(@RequestBody String[] chaincodeParameters)
-			throws CryptoException, InvalidArgumentException, TransactionException, IOException, InterruptedException,
-			ExecutionException, TimeoutException, ProposalException, IllegalAccessException, InstantiationException,
-			ClassNotFoundException, NoSuchMethodException, InvocationTargetException {
+			throws Exception {
 
 		String ops = "transfer";
 		String org = "maple";

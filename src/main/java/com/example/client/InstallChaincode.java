@@ -46,11 +46,12 @@ public class InstallChaincode {
 
 		String path = "../cd-java-cc-1-3";
 		String channelName = StaticConfig.CHANNEL_NAME;
-		String org = "maple";
+		String org = "maple";//fundinc
+		String peerName = StaticConfig.DISCOVER_PEER_MAPLE;
+
 		int version = 1;
 		String chaincodeName = StaticConfig.CHAIN_CODE_ID;
 
-		String peerName = StaticConfig.DISCOVER_PEER_MAPLE;
 		InstallChaincode install = new InstallChaincode();
 		UserFileSystem user = new UserFileSystem("Admin", org + ".fund.com");
 		install.install(path, peerName, channelName, chaincodeName, version, user);

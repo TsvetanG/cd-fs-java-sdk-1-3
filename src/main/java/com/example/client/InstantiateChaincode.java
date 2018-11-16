@@ -25,8 +25,6 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import org.hyperledger.fabric.sdk.ChaincodeEndorsementPolicy;
 import org.hyperledger.fabric.sdk.ChaincodeID;
@@ -90,8 +88,10 @@ public class InstantiateChaincode {
 
 		Collection<Peer> peersToSend = new HashSet<>();
 		for (Peer discPeer : channel.getPeers()) {
-			if (!discPeer.getUrl().contains("fund.com")) {
+			System.out.println("Dis peer: " + discPeer.getName());
+			if (peers.toArray()[0].toString().startsWith(discPeer.getName())) {
 				peersToSend.add(discPeer);
+				System.out.println("Sending to peer: " + discPeer);
 			}
 		}
 
@@ -99,7 +99,7 @@ public class InstantiateChaincode {
 		if (isUpgrade) {
 			UpgradeProposalRequest upgrade = client.newUpgradeProposalRequest();
 			upgrade.setChaincodeID(chaincodeID);
-			upgrade.setProposalWaitTime(60000);
+			upgrade.setProposalWaitTime(600000);
 			upgrade.setFcn("init");
 			upgrade.setChaincodeName(chaincodeName);
 			upgrade.setChaincodeVersion(String.valueOf(version));
@@ -116,7 +116,7 @@ public class InstantiateChaincode {
 		} else {
 
 			InstantiateProposalRequest instantiateProposalRequest = client.newInstantiationProposalRequest();
-			instantiateProposalRequest.setProposalWaitTime(60000);
+			instantiateProposalRequest.setProposalWaitTime(600000);
 			instantiateProposalRequest.setChaincodeID(chaincodeID);
 			instantiateProposalRequest.setFcn("init");
 			instantiateProposalRequest.setChaincodeVersion(String.valueOf(version));

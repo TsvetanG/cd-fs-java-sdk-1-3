@@ -14,6 +14,8 @@
 
 package com.example.client.impl;
 
+import static org.hyperledger.fabric.sdk.Channel.PeerOptions.createPeerOptions;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -24,6 +26,8 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.IOUtils;
 import org.hyperledger.fabric.sdk.Channel;
+import org.hyperledger.fabric.sdk.Channel.SDPeerAddition;
+import org.hyperledger.fabric.sdk.Channel.SDPeerAdditionInfo;
 import org.hyperledger.fabric.sdk.ChannelConfiguration;
 import org.hyperledger.fabric.sdk.EventHub;
 import org.hyperledger.fabric.sdk.HFClient;
@@ -32,8 +36,11 @@ import org.hyperledger.fabric.sdk.Peer;
 import org.hyperledger.fabric.sdk.Peer.PeerRole;
 import org.hyperledger.fabric.sdk.User;
 import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
+import org.hyperledger.fabric.sdk.exception.ServiceDiscoveryException;
 import org.hyperledger.fabric.sdk.exception.TransactionException;
 import org.springframework.util.StringUtils;
+
+import com.example.client.StaticConfig;
 
 public class ChannelUtil {
 
@@ -54,6 +61,8 @@ public class ChannelUtil {
 		Channel channel;
 		try {
 			channel = client.newChannel(channelID);
+			SDPeerAddition peerAddition = new SDPeerAdditionImpl( );
+			channel.setSDPeerAddition(peerAddition);
 		} catch (InvalidArgumentException e) {
 			throw new RuntimeException("Could not create a new channel", e);
 		} // create channel that will be discovered.
@@ -174,6 +183,48 @@ public class ChannelUtil {
 		Channel newChannel = client.newChannel(channelName, orderer, channelConfiguration,
 				client.getChannelConfigurationSignature(channelConfiguration, user));
 		return newChannel;
+	}
+	
+	class SDPeerAdditionImpl implements SDPeerAddition {
+
+		@Override
+		public Peer addPeer(SDPeerAdditionInfo sdPeerAddition) throws InvalidArgumentException, ServiceDiscoveryException {
+			Properties properties = new Properties();
+			final String endpoint = sdPeerAddition.getEndpoint();
+			final String mspid = sdPeerAddition.getMspId();
+
+			
+			Peer peer = sdPeerAddition.getEndpointMap().get(endpoint); // maybe there already.
+			if (null != peer) {
+				return peer;
+			}
+
+
+			byte[] pemBytes = sdPeerAddition.getAllTLSCerts();
+			if (pemBytes.length > 0) {
+				properties.put("pemBytes", pemBytes);
+			}
+			
+			System.out.println("Adding discovered peer: " + endpoint);
+			
+			String[] hostPort = StringUtils.split(endpoint, ":");
+			
+			String host = StaticConfig.GRPC_HOST;
+			String port = StaticConfig.findPort(hostPort[0]);
+			
+			properties.put("hostnameOverride", hostPort[0]);
+			
+
+			peer = sdPeerAddition.getClient().newPeer(endpoint, host + ":" + port, properties);
+			
+			System.out.println("Adding new peer: " + peer);
+
+			sdPeerAddition.getChannel().addPeer(peer, createPeerOptions().setPeerRoles(EnumSet.of(PeerRole.ENDORSING_PEER,
+					PeerRole.EVENT_SOURCE, PeerRole.LEDGER_QUERY, PeerRole.CHAINCODE_QUERY))); // application can decide on
+																								// roles.
+
+			return peer;
+		}
 	}
 
 }

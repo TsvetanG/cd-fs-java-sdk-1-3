@@ -20,7 +20,6 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
@@ -30,7 +29,6 @@ import javax.servlet.http.HttpServletResponse;
 import org.hyperledger.fabric.sdk.ChaincodeID;
 import org.hyperledger.fabric.sdk.Channel;
 import org.hyperledger.fabric.sdk.HFClient;
-import org.hyperledger.fabric.sdk.Peer;
 import org.hyperledger.fabric.sdk.ProposalResponse;
 import org.hyperledger.fabric.sdk.QueryByChaincodeRequest;
 import org.hyperledger.fabric.sdk.exception.CryptoException;
@@ -63,7 +61,7 @@ public class QueryChaincode {
 		String[] params = new String[] { "Bob" };
 
 		UserFileSystem user = new UserFileSystem("Admin", org + ".fund.com");
-		new QueryChaincode().query(params, org, discoveryPeer, channelName, chainCode, user);
+		new QueryChaincode().query(params, discoveryPeer, channelName, chainCode, user);
 
 	}
 
@@ -81,13 +79,13 @@ public class QueryChaincode {
 		UserFileSystem user = new UserFileSystem("Admin", org + ".funds.com");
 		QueryResult queryResult = new QueryResult();
 
-		String result = query(params, org, peerName, channelName, chainCode, user);
+		String result = query(params, peerName, channelName, chainCode, user);
 		queryResult.setResponse(result);
 		System.out.println("executed query: result is " + queryResult.getResponse());
 		return queryResult;
 	}
 
-	public String query(String[] params, String org, String peerName, String channelID, String chainCode,
+	public String query(String[] params, String peerName, String channelID, String chainCode,
 			UserFileSystem user) throws CryptoException, InvalidArgumentException, TransactionException, IOException,
 			InterruptedException, ExecutionException, TimeoutException, ProposalException, IllegalAccessException,
 			InstantiationException, ClassNotFoundException, NoSuchMethodException, InvocationTargetException {
@@ -111,14 +109,8 @@ public class QueryChaincode {
 		tm2.put("method", "QueryByChaincodeRequest".getBytes(UTF_8));
 		queryByChaincodeRequest.setTransientMap(tm2);
 
-		Collection<Peer> peersToSend = new HashSet<>();
-		for (Peer discPeer : channel.getPeers()) {
-			if (!discPeer.getUrl().contains("fund.com")) {
-				peersToSend.add(discPeer);
-			}
-		}
 
-		Collection<ProposalResponse> queryProposals = channel.queryByChaincode(queryByChaincodeRequest, peersToSend);
+		Collection<ProposalResponse> queryProposals = channel.queryByChaincode(queryByChaincodeRequest);
 		for (ProposalResponse proposalResponse : queryProposals) {
 			if (!proposalResponse.isVerified() || proposalResponse.getStatus() != ProposalResponse.Status.SUCCESS) {
 				System.out.println("Cannot query on peer > " + proposalResponse.getPeer().getUrl());

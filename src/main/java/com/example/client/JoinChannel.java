@@ -43,7 +43,7 @@ public class JoinChannel {
 		 * For the correct ports check docker-compose-base.yaml
 		 */
 		String channelName = StaticConfig.CHANNEL_NAME;
-		String org = "maple";
+		String org = "maple";//fundinc
 		String portClient = "7051";// for fundinc 9051
 
 		String peer = "peer0." + org + ".fund.com:" + StaticConfig.GRPC_HOST + ":" + portClient;
